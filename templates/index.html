@@ -1,0 +1,194 @@
+{% extends "base.html" %}
+
+{% block title %}Accueil - Sneakly{% endblock %}
+
+{% block content %}
+{% if not category %}
+<!-- Hero Section -->
+<section class="hero">
+    <div class="hero-content">
+        <h1>Bienvenue sur Sneakly</h1>
+        <p>Découvrez notre collection de produits de qualité</p>
+        <a href="#products" class="btn btn-primary">
+            <i class="fas fa-shopping-bag"></i>
+            Voir les produits
+        </a>
+    </div>
+    <div class="hero-image">
+        <i class="fas fa-shopping-cart hero-icon"></i>
+    </div>
+</section>
+
+<!-- Features Section -->
+<section class="features">
+    <div class="container">
+        <div class="features-grid">
+            <div class="feature-card">
+                <div class="feature-icon">
+                    <i class="fas fa-shipping-fast"></i>
+                </div>
+                <h3>Livraison Rapide</h3>
+                <p>Livraison sous 24-48h partout en France</p>
+            </div>
+            <div class="feature-card">
+                <div class="feature-icon">
+                    <i class="fas fa-shield-alt"></i>
+                </div>
+                <h3>Paiement Sécurisé</h3>
+                <p>Transactions protégées et sécurisées</p>
+            </div>
+            <div class="feature-card">
+                <div class="feature-icon">
+                    <i class="fas fa-undo"></i>
+                </div>
+                <h3>Retours Faciles</h3>
+                <p>Retour gratuit sous 30 jours</p>
+            </div>
+            <div class="feature-card">
+                <div class="feature-icon">
+                    <i class="fas fa-headset"></i>
+                </div>
+                <h3>Support 24/7</h3>
+                <p>Notre équipe est là pour vous aider</p>
+            </div>
+        </div>
+    </div>
+</section>
+{% endif %}
+
+<!-- Products Section -->
+<section id="products" class="products-section">
+    <div class="container">
+        <div class="section-header">
+            {% if search_term %}
+                <h2>Résultats de recherche</h2>
+                <p>{{ products|length }} produit{% if products|length > 1 %}s{% endif %} trouvé{% if products|length > 1 %}s{% endif %} pour "{{ search_term }}"</p>
+            {% elif category %}
+                <h2>Collection {{ category|capitalize }}</h2>
+                <p>Découvrez nos produits {{ category }}</p>
+            {% else %}
+                <h2>Nos Produits</h2>
+                <p>Découvrez notre sélection de produits de qualité</p>
+            {% endif %}
+        </div>
+        
+        <div class="products-grid" id="products-grid">
+            {% for product in products %}
+            <div class="product-card" data-product-id="{{ product.id }}" {% if product.category %}data-category="{{ product.category }}"{% endif %}>
+                <a class="product-image" href="{{ url_for('product_detail', product_id=product.id) }}">
+                    {% if product.image_url %}
+                        <img src="{{ product.image_url }}" alt="{{ product.name }}" loading="lazy">
+                    {% else %}
+                        <i class="fas fa-image product-placeholder"></i>
+                    {% endif %}
+                </a>
+                <div class="product-info">
+                    <h3 class="product-name"><a href="{{ url_for('product_detail', product_id=product.id) }}">{{ product.name }}</a></h3>
+                    <p class="product-description">{{ product.description }}</p>
+                    <div class="product-price">
+                        <span class="price">{{ "%.2f"|format(product.price_cents / 100) }}€</span>
+                        {% if product.stock_qty > 0 %}
+                            <span class="stock">En stock ({{ product.stock_qty }})</span>
+                        {% else %}
+                            <span class="stock out">Rupture de stock</span>
+                        {% endif %}
+                    </div>
+                    <div class="product-actions">
+                        <div class="quantity-selector">
+                            <button class="qty-btn minus" onclick="changeQuantity('{{ product.id }}', -1)">
+                                <i class="fas fa-minus"></i>
+                            </button>
+                            <input type="number" class="qty-input" id="qty-{{ product.id }}" value="1" min="1" max="{{ product.stock_qty }}">
+                            <button class="qty-btn plus" onclick="changeQuantity('{{ product.id }}', 1)">
+                                <i class="fas fa-plus"></i>
+                            </button>
+                        </div>
+                        <button class="btn btn-primary add-to-cart" 
+                                onclick="addToCart('{{ product.id }}')"
+                                {% if product.stock_qty == 0 %}disabled{% endif %}>
+                            <i class="fas fa-cart-plus"></i>
+                            Ajouter au panier
+                        </button>
+                    </div>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+</section>
+
+{% if not category %}
+<!-- Newsletter Section -->
+<section class="newsletter">
+    <div class="container">
+        <div class="newsletter-content">
+            <h2>Restez informé</h2>
+            <p>Recevez nos dernières nouveautés et offres spéciales</p>
+            <form class="newsletter-form">
+                <input type="email" placeholder="Votre adresse email" required>
+                <button type="submit" class="btn btn-primary">
+                    <i class="fas fa-paper-plane"></i>
+                    S'abonner
+                </button>
+            </form>
+        </div>
+    </div>
+</section>
+{% endif %}
+{% endblock %}
+
+{% block extra_js %}
+<script>
+function changeQuantity(productId, change) {
+    const input = document.getElementById('qty-' + productId);
+    const currentValue = parseInt(input.value);
+    const newValue = Math.max(1, Math.min(input.max, currentValue + change));
+    input.value = newValue;
+}
+
+function addToCart(productId) {
+    const quantity = parseInt(document.getElementById('qty-' + productId).value);
+    
+    fetch('/add_to_cart', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+            product_id: productId,
+            quantity: quantity
+        })
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            showNotification('Produit ajouté au panier !', 'success');
+            updateCartCount();
+        } else {
+            showNotification(data.error || 'Erreur lors de l\'ajout au panier', 'error');
+        }
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        showNotification('Erreur de connexion', 'error');
+    });
+}
+
+function updateCartCount() {
+    fetch('/api/cart')
+    .then(response => response.json())
+    .then(data => {
+        if (data.items) {
+            const totalItems = data.items.reduce((sum, item) => sum + item.quantity, 0);
+            document.getElementById('cart-count').textContent = totalItems;
+        }
+    })
+    .catch(error => console.error('Error updating cart count:', error));
+}
+
+// Mise à jour du compteur au chargement de la page
+document.addEventListener('DOMContentLoaded', function() {
+    updateCartCount();
+});
+</script>
+{% endblock %}

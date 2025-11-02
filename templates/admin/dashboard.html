@@ -1,0 +1,305 @@
+{% extends "base.html" %}
+
+{% block title %}Administration - Sneakly{% endblock %}
+
+{% block content %}
+<div class="container">
+    <div class="page-header">
+        <h1><i class="fas fa-cog"></i> Administration</h1>
+        <p>Panneau d'administration Sneakly</p>
+    </div>
+    
+    <div class="admin-dashboard">
+        <!-- Statistiques générales -->
+        <div class="stats-grid">
+            <div class="stat-card">
+                <div class="stat-icon">
+                    <i class="fas fa-users"></i>
+                </div>
+                <div class="stat-content">
+                    <div class="stat-number">{{ users|length }}</div>
+                    <div class="stat-label">Utilisateurs</div>
+                </div>
+            </div>
+            
+            <div class="stat-card">
+                <div class="stat-icon">
+                    <i class="fas fa-box"></i>
+                </div>
+                <div class="stat-content">
+                    <div class="stat-number">{{ orders|length }}</div>
+                    <div class="stat-label">Commandes</div>
+                </div>
+            </div>
+            
+            <div class="stat-card">
+                <div class="stat-icon">
+                    <i class="fas fa-euro-sign"></i>
+                </div>
+                <div class="stat-content">
+                    <div class="stat-number">
+                        {% set total_revenue = orders|sum(attribute='total_cents') %}
+                        {{ "%.0f"|format(total_revenue / 100) }}€
+                    </div>
+                    <div class="stat-label">Chiffre d'affaires</div>
+                </div>
+            </div>
+            
+            <div class="stat-card">
+                <div class="stat-icon">
+                    <i class="fas fa-shopping-cart"></i>
+                </div>
+                <div class="stat-content">
+                    <div class="stat-number">
+                        {% set pending_orders = orders|selectattr('status.name', 'equalto', 'CREE')|list %}
+                        {{ pending_orders|length }}
+                    </div>
+                    <div class="stat-label">En attente</div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Actions rapides -->
+        <div class="admin-actions">
+            <h2><i class="fas fa-bolt"></i> Actions rapides</h2>
+            <div class="actions-grid">
+                <a href="{{ url_for('admin_orders') }}" class="action-card">
+                    <i class="fas fa-box"></i>
+                    <h3>Gérer les commandes</h3>
+                    <p>Valider, expédier et suivre les commandes</p>
+                </a>
+                
+                <a href="#" class="action-card" onclick="showProductModal()">
+                    <i class="fas fa-plus"></i>
+                    <h3>Ajouter un produit</h3>
+                    <p>Créer un nouveau produit</p>
+                </a>
+                
+                <a href="#" class="action-card">
+                    <i class="fas fa-chart-line"></i>
+                    <h3>Rapports</h3>
+                    <p>Analyser les ventes et performances</p>
+                </a>
+                
+                <a href="#" class="action-card">
+                    <i class="fas fa-headset"></i>
+                    <h3>Support client</h3>
+                    <p>Gérer les demandes clients</p>
+                </a>
+            </div>
+        </div>
+        
+        <!-- Dernières commandes -->
+        <div class="recent-orders">
+            <h2><i class="fas fa-clock"></i> Dernières commandes</h2>
+            <div class="orders-table">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>ID</th>
+                            <th>Client</th>
+                            <th>Date</th>
+                            <th>Montant</th>
+                            <th>Statut</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for order in orders[:10] %}
+                        {% set customer = users.get(order.user_id) %}
+                        <tr>
+                            <td>{{ order.id[:8] }}</td>
+                            <td>{{ customer.first_name if customer else 'N/A' }} {{ customer.last_name if customer else '' }}</td>
+                            <td>{{ order.created_at|int|timestamp_to_date }}</td>
+                            <td>{{ "%.2f"|format(order.total_cents() / 100) }}€</td>
+                            <td>
+                                <span class="status-badge status-{{ order.status.name.lower() }}">
+                                    {{ order.status.name }}
+                                </span>
+                            </td>
+                            <td>
+                                <div class="action-buttons">
+                                    {% if order.status.name == 'CREE' %}
+                                        <button class="btn btn-sm btn-success" onclick="validateOrder('{{ order.id }}')">
+                                            <i class="fas fa-check"></i>
+                                        </button>
+                                    {% endif %}
+                                    {% if order.status.name == 'PAYEE' %}
+                                        <button class="btn btn-sm btn-primary" onclick="shipOrder('{{ order.id }}')">
+                                            <i class="fas fa-truck"></i>
+                                        </button>
+                                    {% endif %}
+                                    {% if order.status.name == 'EXPEDIEE' %}
+                                        <button class="btn btn-sm btn-info" onclick="markDelivered('{{ order.id }}')">
+                                            <i class="fas fa-home"></i>
+                                        </button>
+                                    {% endif %}
+                                </div>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal d'ajout de produit -->
+<div id="product-modal" class="modal">
+    <div class="modal-content">
+        <div class="modal-header">
+            <h2><i class="fas fa-plus"></i> Ajouter un produit</h2>
+            <button class="modal-close" onclick="closeProductModal()">
+                <i class="fas fa-times"></i>
+            </button>
+        </div>
+        
+        <div class="modal-body">
+            <form id="product-form">
+                <div class="form-group">
+                    <label for="product-name">Nom du produit</label>
+                    <input type="text" id="product-name" required>
+                </div>
+                
+                <div class="form-group">
+                    <label for="product-description">Description</label>
+                    <textarea id="product-description" rows="3" required></textarea>
+                </div>
+                
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="product-price">Prix (en centimes)</label>
+                        <input type="number" id="product-price" required min="1">
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="product-stock">Stock</label>
+                        <input type="number" id="product-stock" required min="0">
+                    </div>
+                </div>
+                
+                <div class="form-actions">
+                    <button type="button" class="btn btn-secondary" onclick="closeProductModal()">
+                        Annuler
+                    </button>
+                    <button type="submit" class="btn btn-primary">
+                        <i class="fas fa-save"></i>
+                        Créer le produit
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+function showProductModal() {
+    document.getElementById('product-modal').style.display = 'flex';
+}
+
+function closeProductModal() {
+    document.getElementById('product-modal').style.display = 'none';
+}
+
+function validateOrder(orderId) {
+    fetch('/admin/validate_order', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+            order_id: orderId
+        })
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            showNotification('Commande validée avec succès', 'success');
+            setTimeout(() => location.reload(), 1000);
+        } else {
+            showNotification(data.error || 'Erreur lors de la validation', 'error');
+        }
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        showNotification('Erreur de connexion', 'error');
+    });
+}
+
+function shipOrder(orderId) {
+    fetch('/admin/ship_order', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+            order_id: orderId
+        })
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            showNotification('Commande expédiée avec succès', 'success');
+            setTimeout(() => location.reload(), 1000);
+        } else {
+            showNotification(data.error || 'Erreur lors de l\'expédition', 'error');
+        }
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        showNotification('Erreur de connexion', 'error');
+    });
+}
+
+function markDelivered(orderId) {
+    fetch('/admin/mark_delivered', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+            order_id: orderId
+        })
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            showNotification('Commande marquée comme livrée', 'success');
+            setTimeout(() => location.reload(), 1000);
+        } else {
+            showNotification(data.error || 'Erreur lors de la mise à jour', 'error');
+        }
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        showNotification('Erreur de connexion', 'error');
+    });
+}
+
+document.getElementById('product-form').addEventListener('submit', function(e) {
+    e.preventDefault();
+    
+    const productData = {
+        name: document.getElementById('product-name').value,
+        description: document.getElementById('product-description').value,
+        price_cents: parseInt(document.getElementById('product-price').value),
+        stock_qty: parseInt(document.getElementById('product-stock').value)
+    };
+    
+    // Ici vous pourriez ajouter une API pour créer le produit
+    showNotification('Produit créé avec succès !', 'success');
+    closeProductModal();
+    setTimeout(() => location.reload(), 1000);
+});
+
+// Fermer les modals en cliquant à l'extérieur
+document.getElementById('product-modal').addEventListener('click', function(e) {
+    if (e.target === this) {
+        closeProductModal();
+    }
+});
+</script>
+{% endblock %}

@@ -1,0 +1,235 @@
+{% extends "base.html" %}
+
+{% block title %}Mes Commandes - Sneakly{% endblock %}
+
+{% block content %}
+<div class="container">
+    <div class="page-header">
+        <h1><i class="fas fa-box"></i> Mes Commandes</h1>
+        <p>Suivez l'état de vos commandes</p>
+    </div>
+    
+    {% if orders %}
+        <div class="orders-container">
+            {% for order in orders %}
+            <div class="order-card" id="order-{{ order.id }}">
+                <div class="order-header">
+                    <div class="order-info">
+                        <h3>Commande #{{ order.id[:8] }}</h3>
+                        <p class="order-date">
+                            <i class="fas fa-calendar"></i>
+                            {{ order.created_at|int|timestamp_to_date }}
+                        </p>
+                    </div>
+                    <div class="order-status">
+                        <span class="status-badge status-{{ order.status.name.lower() }}">
+                            {% if order.status.name == 'CREE' %}
+                                <i class="fas fa-clock"></i> En attente
+                            {% elif order.status.name == 'VALIDEE' %}
+                                <i class="fas fa-check"></i> Validée
+                            {% elif order.status.name == 'PAYEE' %}
+                                <i class="fas fa-credit-card"></i> Payée
+                            {% elif order.status.name == 'EXPEDIEE' %}
+                                <i class="fas fa-truck"></i> Expédiée
+                            {% elif order.status.name == 'LIVREE' %}
+                                <i class="fas fa-home"></i> Livrée
+                            {% elif order.status.name == 'ANNULEE' %}
+                                <i class="fas fa-times"></i> Annulée
+                            {% elif order.status.name == 'REMBOURSEE' %}
+                                <i class="fas fa-undo"></i> Remboursée
+                            {% endif %}
+                        </span>
+                    </div>
+                </div>
+                
+                <div class="order-items">
+                    <h4>Articles commandés :</h4>
+                    <div class="items-list">
+                        {% for item in order.items %}
+                        <div class="order-item">
+                            <div class="item-info">
+                                <span class="item-name">{{ item.name }}</span>
+                                <span class="item-quantity">x{{ item.quantity }}</span>
+                            </div>
+                            <div class="item-price">
+                                {{ "%.2f"|format((item.unit_price_cents * item.quantity) / 100) }}€
+                            </div>
+                        </div>
+                        {% endfor %}
+                    </div>
+                </div>
+                
+                <div class="order-footer">
+                    <div class="order-total">
+                        <strong>Total : {{ "%.2f"|format(order.total_cents() / 100) }}€</strong>
+                    </div>
+                    
+                    <div class="order-actions">
+                        {% if order.status.name in ['CREE', 'VALIDEE'] %}
+                            <button class="btn btn-danger btn-sm" onclick="cancelOrder('{{ order.id }}')">
+                                <i class="fas fa-times"></i>
+                                Annuler
+                            </button>
+                        {% endif %}
+                        
+                        {% if order.delivery and order.delivery.tracking_number %}
+                            <button class="btn btn-info btn-sm" onclick="showTracking('{{ order.delivery.tracking_number }}')">
+                                <i class="fas fa-search"></i>
+                                Suivre
+                            </button>
+                        {% endif %}
+                        
+                        <button class="btn btn-secondary btn-sm" onclick="toggleOrderDetails('{{ order.id }}')">
+                            <i class="fas fa-info-circle"></i>
+                            Détails
+                        </button>
+                    </div>
+                </div>
+                
+                <!-- Détails cachés -->
+                <div class="order-details" id="details-{{ order.id }}" style="display: none;">
+                    <div class="details-grid">
+                        <div class="detail-section">
+                            <h5><i class="fas fa-info-circle"></i> Informations</h5>
+                            <ul>
+                                <li><strong>ID Commande :</strong> {{ order.id }}</li>
+                                <li><strong>Date de création :</strong> {{ order.created_at|int|timestamp_to_date }}</li>
+                                {% if order.validated_at %}
+                                    <li><strong>Date de validation :</strong> {{ order.validated_at|int|timestamp_to_date }}</li>
+                                {% endif %}
+                                {% if order.paid_at %}
+                                    <li><strong>Date de paiement :</strong> {{ order.paid_at|int|timestamp_to_date }}</li>
+                                {% endif %}
+                                {% if order.shipped_at %}
+                                    <li><strong>Date d'expédition :</strong> {{ order.shipped_at|int|timestamp_to_date }}</li>
+                                {% endif %}
+                                {% if order.delivered_at %}
+                                    <li><strong>Date de livraison :</strong> {{ order.delivered_at|int|timestamp_to_date }}</li>
+                                {% endif %}
+                            </ul>
+                        </div>
+                        
+                        {% if order.delivery %}
+                        <div class="detail-section">
+                            <h5><i class="fas fa-truck"></i> Livraison</h5>
+                            <ul>
+                                <li><strong>Transporteur :</strong> {{ order.delivery.carrier }}</li>
+                                {% if order.delivery.tracking_number %}
+                                    <li><strong>Numéro de suivi :</strong> {{ order.delivery.tracking_number }}</li>
+                                {% endif %}
+                                <li><strong>Adresse :</strong> {{ order.delivery.address }}</li>
+                                <li><strong>Statut :</strong> {{ order.delivery.status }}</li>
+                            </ul>
+                        </div>
+                        {% endif %}
+                        
+                        {% if order.invoice_id %}
+                        <div class="detail-section">
+                            <h5><i class="fas fa-file-invoice"></i> Facturation</h5>
+                            <ul>
+                                <li><strong>Facture :</strong> {{ order.invoice_id }}</li>
+                                <li><strong>Montant :</strong> {{ "%.2f"|format(order.total_cents() / 100) }}€</li>
+                            </ul>
+                        </div>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+    {% else %}
+        <div class="empty-state">
+            <i class="fas fa-shopping-bag"></i>
+            <h3>Aucune commande</h3>
+            <p>Vous n'avez pas encore passé de commande</p>
+            <a href="{{ url_for('index') }}" class="btn btn-primary">
+                <i class="fas fa-shopping-bag"></i>
+                Commencer mes achats
+            </a>
+        </div>
+    {% endif %}
+</div>
+
+<!-- Modal de suivi -->
+<div id="tracking-modal" class="modal">
+    <div class="modal-content">
+        <div class="modal-header">
+            <h2><i class="fas fa-search"></i> Suivi de colis</h2>
+            <button class="modal-close" onclick="closeTrackingModal()">
+                <i class="fas fa-times"></i>
+            </button>
+        </div>
+        
+        <div class="modal-body">
+            <div class="tracking-info">
+                <div class="tracking-number">
+                    <label>Numéro de suivi :</label>
+                    <span id="tracking-number-display"></span>
+                </div>
+                <div class="tracking-status">
+                    <label>Statut :</label>
+                    <span id="tracking-status-display"></span>
+                </div>
+                <div class="tracking-note">
+                    <p><i class="fas fa-info-circle"></i> 
+                    Vous pouvez suivre votre colis directement sur le site du transporteur avec ce numéro.</p>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+function toggleOrderDetails(orderId) {
+    const details = document.getElementById('details-' + orderId);
+    const isVisible = details.style.display !== 'none';
+    details.style.display = isVisible ? 'none' : 'block';
+}
+
+function cancelOrder(orderId) {
+    if (confirm('Êtes-vous sûr de vouloir annuler cette commande ?')) {
+        fetch('/cancel_order', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+                order_id: orderId
+            })
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                showNotification('Commande annulée avec succès', 'success');
+                setTimeout(() => location.reload(), 1000);
+            } else {
+                showNotification(data.error || 'Erreur lors de l\'annulation', 'error');
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            showNotification('Erreur de connexion', 'error');
+        });
+    }
+}
+
+function showTracking(trackingNumber) {
+    document.getElementById('tracking-number-display').textContent = trackingNumber;
+    document.getElementById('tracking-status-display').textContent = 'En cours de livraison';
+    document.getElementById('tracking-modal').style.display = 'flex';
+}
+
+function closeTrackingModal() {
+    document.getElementById('tracking-modal').style.display = 'none';
+}
+
+// Fermer le modal en cliquant à l'extérieur
+document.getElementById('tracking-modal').addEventListener('click', function(e) {
+    if (e.target === this) {
+        closeTrackingModal();
+    }
+});
+</script>
+{% endblock %}

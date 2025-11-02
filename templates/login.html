@@ -1,0 +1,59 @@
+{% extends "base.html" %}
+
+{% block title %}Connexion - Sneakly{% endblock %}
+
+{% block content %}
+<div class="auth-container">
+    <div class="auth-card">
+        <div class="auth-header">
+            <h1>Connexion</h1>
+            <p>Connectez-vous à votre compte</p>
+        </div>
+        
+        <form method="POST" class="auth-form">
+            <div class="form-group">
+                <label for="email">
+                    <i class="fas fa-envelope"></i>
+                    Adresse email
+                </label>
+                <input type="email" id="email" name="email" required 
+                       placeholder="votre@email.com" value="client@shop.test">
+            </div>
+            
+            <div class="form-group">
+                <label for="password">
+                    <i class="fas fa-lock"></i>
+                    Mot de passe
+                </label>
+                <input type="password" id="password" name="password" required 
+                       placeholder="Votre mot de passe" value="secret">
+            </div>
+            
+            <div class="form-options">
+                <label class="checkbox-label">
+                    <input type="checkbox" name="remember">
+                    <span class="checkmark"></span>
+                    Se souvenir de moi
+                </label>
+                <a href="#" class="forgot-password">Mot de passe oublié ?</a>
+            </div>
+            
+            <button type="submit" class="btn btn-primary btn-full">
+                <i class="fas fa-sign-in-alt"></i>
+                Se connecter
+            </button>
+        </form>
+        
+        <div class="auth-footer">
+            <p>Pas encore de compte ? <a href="{{ url_for('register') }}">Créer un compte</a></p>
+        </div>
+        
+        <div class="demo-accounts">
+            <h3>Compte de démonstration</h3>
+            <div class="demo-account">
+                <strong>Client :</strong> client@shop.test / secret
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

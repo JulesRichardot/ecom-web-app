@@ -1,0 +1,436 @@
+{% extends "base.html" %}
+
+{% block title %}Support Client - Sneakly{% endblock %}
+
+{% block content %}
+<div class="container">
+    <div class="page-header">
+        <h1><i class="fas fa-headset"></i> Support Client</h1>
+        <p>Nous sommes là pour vous aider</p>
+    </div>
+    
+    <div class="support-container">
+        <div class="support-actions">
+            <button class="btn btn-primary" onclick="openNewThread()">
+                <i class="fas fa-plus"></i>
+                Nouvelle demande
+            </button>
+        </div>
+        
+        {% if threads %}
+            <div class="threads-list">
+                {% for thread in threads %}
+                <div class="thread-card" data-thread-id="{{ thread.id }}">
+                    <div class="thread-header">
+                        <div class="thread-info">
+                            <h3>{{ thread.subject }}</h3>
+                            <p class="thread-date">
+                                <i class="fas fa-calendar"></i>
+                                {{ thread.messages[0].created_at|int|timestamp_to_date if thread.messages else 'Aucun message' }}
+                            </p>
+                        </div>
+                        <div class="thread-status">
+                            {% if thread.closed %}
+                                <span class="status-badge status-closed">
+                                    <i class="fas fa-lock"></i> Fermé
+                                </span>
+                            {% else %}
+                                <span class="status-badge status-open">
+                                    <i class="fas fa-comment"></i> Ouvert
+                                </span>
+                            {% endif %}
+                        </div>
+                    </div>
+                    
+                    <div class="thread-preview">
+                        {% if thread.messages %}
+                            <p>{{ thread.messages[-1].body[:100] }}{% if thread.messages[-1].body|length > 100 %}...{% endif %}</p>
+                        {% else %}
+                            <p>Aucun message dans ce fil</p>
+                        {% endif %}
+                    </div>
+                    
+                    <div class="thread-actions">
+                        <button class="btn btn-sm btn-primary" onclick="openThread('{{ thread.id }}', {{ 'true' if thread.closed else 'false' }})">
+                            <i class="fas fa-eye"></i>
+                            Voir les messages
+                        </button>
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+        {% else %}
+            <div class="empty-state">
+                <i class="fas fa-comments"></i>
+                <h3>Aucune demande de support</h3>
+                <p>Vous n'avez pas encore créé de demande de support</p>
+                <button class="btn btn-primary" onclick="openNewThread()">
+                    <i class="fas fa-plus"></i>
+                    Nouvelle demande
+                </button>
+            </div>
+        {% endif %}
+    </div>
+</div>
+
+<!-- Modal pour nouveau fil -->
+<div id="new-thread-modal" class="modal">
+    <div class="modal-content">
+        <div class="modal-header">
+            <h2><i class="fas fa-plus"></i> Nouvelle demande</h2>
+            <button class="modal-close" onclick="closeNewThreadModal()">
+                <i class="fas fa-times"></i>
+            </button>
+        </div>
+        
+        <div class="modal-body">
+            <form id="new-thread-form">
+                <div class="form-group">
+                    <label for="thread-subject">Sujet</label>
+                    <input type="text" id="thread-subject" required placeholder="Décrivez brièvement votre problème">
+                </div>
+                
+                <div class="form-group">
+                    <label for="thread-order">Commande concernée (optionnel)</label>
+                    <select id="thread-order">
+                        <option value="">Sélectionner une commande</option>
+                        <!-- Les options seront remplies par JavaScript -->
+                    </select>
+                </div>
+                
+                <div class="form-group">
+                    <label for="thread-message">Message</label>
+                    <textarea id="thread-message" rows="5" required placeholder="Décrivez votre problème en détail..."></textarea>
+                </div>
+                
+                <div class="form-actions">
+                    <button type="button" class="btn btn-secondary" onclick="closeNewThreadModal()">
+                        Annuler
+                    </button>
+                    <button type="submit" class="btn btn-primary">
+                        <i class="fas fa-paper-plane"></i>
+                        Envoyer
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- Modal pour voir/répondre à un fil -->
+<div id="thread-modal" class="modal">
+    <div class="modal-content large">
+        <div class="modal-header">
+            <h2 id="thread-modal-title"><i class="fas fa-comments"></i> Conversation</h2>
+            <button class="modal-close" onclick="closeThreadModal()">
+                <i class="fas fa-times"></i>
+            </button>
+        </div>
+        
+        <div class="modal-body">
+            <div class="thread-messages" id="thread-messages">
+                <!-- Les messages seront chargés ici -->
+            </div>
+            
+            <div class="thread-reply" id="thread-reply" style="display: none;">
+                <form id="reply-form">
+                    <div class="form-group">
+                        <label for="reply-message">Votre réponse</label>
+                        <textarea id="reply-message" rows="3" required placeholder="Tapez votre message..."></textarea>
+                    </div>
+                    <div class="form-actions">
+                        <button type="button" class="btn btn-secondary" onclick="cancelReply()">
+                            Annuler
+                        </button>
+                        <button type="submit" class="btn btn-primary">
+                            <i class="fas fa-paper-plane"></i>
+                            Envoyer
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_css %}
+<style>
+.support-container {
+    max-width: 800px;
+    margin: 0 auto;
+}
+
+.support-actions {
+    margin-bottom: 2rem;
+    text-align: right;
+}
+
+.threads-list {
+    space-y: 1rem;
+}
+
+.thread-card {
+    background: var(--surface-color);
+    border-radius: var(--radius-lg);
+    padding: 1.5rem;
+    box-shadow: var(--shadow-sm);
+    margin-bottom: 1rem;
+    transition: all 0.2s ease;
+}
+
+.thread-card:hover {
+    box-shadow: var(--shadow-md);
+}
+
+.thread-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 1rem;
+}
+
+.thread-info h3 {
+    font-size: 1.25rem;
+    font-weight: 600;
+    margin-bottom: 0.25rem;
+}
+
+.thread-date {
+    color: var(--text-secondary);
+    font-size: 0.875rem;
+}
+
+.thread-preview {
+    margin-bottom: 1rem;
+    color: var(--text-secondary);
+}
+
+.thread-actions {
+    display: flex;
+    gap: 0.5rem;
+}
+
+.status-open {
+    background: #dbeafe;
+    color: #1e40af;
+}
+
+.status-closed {
+    background: #f3f4f6;
+    color: #6b7280;
+}
+
+.thread-messages {
+    max-height: 400px;
+    overflow-y: auto;
+    margin-bottom: 1rem;
+    space-y: 1rem;
+}
+
+.message {
+    display: flex;
+    gap: 1rem;
+    padding: 1rem;
+    border-radius: var(--radius-md);
+}
+
+.message.user {
+    background: var(--primary-color);
+    color: white;
+    margin-left: 2rem;
+}
+
+.message.support {
+    background: var(--background-color);
+    margin-right: 2rem;
+}
+
+.message-content {
+    flex: 1;
+}
+
+.message-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 0.5rem;
+}
+
+.message-author {
+    font-weight: 600;
+    font-size: 0.875rem;
+}
+
+.message-time {
+    font-size: 0.75rem;
+    opacity: 0.7;
+}
+
+.message-body {
+    line-height: 1.5;
+}
+
+.thread-reply {
+    border-top: 1px solid var(--border-color);
+    padding-top: 1rem;
+}
+
+.modal-content.large {
+    max-width: 800px;
+}
+</style>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+let currentThreadId = null;
+
+function openNewThread() {
+    document.getElementById('new-thread-modal').style.display = 'flex';
+    loadUserOrders();
+}
+
+function closeNewThreadModal() {
+    document.getElementById('new-thread-modal').style.display = 'none';
+    document.getElementById('new-thread-form').reset();
+}
+
+function openThread(threadId, isClosed) {
+    currentThreadId = threadId;
+    loadThreadMessages(threadId);
+    document.getElementById('thread-modal').style.display = 'flex';
+    // Automatically show reply form when opening thread (same behavior as old "Répondre" button)
+    // Only show reply form if thread is not closed
+    if (!isClosed) {
+        document.getElementById('thread-reply').style.display = 'block';
+    } else {
+        document.getElementById('thread-reply').style.display = 'none';
+    }
+}
+
+function closeThreadModal() {
+    document.getElementById('thread-modal').style.display = 'none';
+    document.getElementById('thread-reply').style.display = 'none';
+    document.getElementById('reply-form').reset();
+    currentThreadId = null;
+}
+
+function cancelReply() {
+    document.getElementById('thread-reply').style.display = 'none';
+    document.getElementById('reply-form').reset();
+}
+
+function loadUserOrders() {
+    // Charger les commandes de l'utilisateur pour le select
+    fetch('/api/orders')
+        .then(response => response.json())
+        .then(data => {
+            const select = document.getElementById('thread-order');
+            select.innerHTML = '<option value="">Sélectionner une commande</option>';
+            
+            if (data.orders) {
+                data.orders.forEach(order => {
+                    const option = document.createElement('option');
+                    option.value = order.id;
+                    option.textContent = `Commande #${order.id.substring(0, 8)} - ${formatPrice(order.total_cents)}`;
+                    select.appendChild(option);
+                });
+            }
+        })
+        .catch(error => console.error('Error loading orders:', error));
+}
+
+function loadThreadMessages(threadId) {
+    // Simuler le chargement des messages
+    const messagesContainer = document.getElementById('thread-messages');
+    messagesContainer.innerHTML = '<div class="loading">Chargement des messages...</div>';
+    
+    // Ici vous pourriez faire un appel API pour récupérer les messages
+    setTimeout(() => {
+        messagesContainer.innerHTML = `
+            <div class="message support">
+                <div class="message-content">
+                    <div class="message-header">
+                        <span class="message-author">Support Sneakly</span>
+                        <span class="message-time">${new Date().toLocaleString('fr-FR')}</span>
+                    </div>
+                    <div class="message-body">
+                        Bonjour ! Comment pouvons-nous vous aider aujourd'hui ?
+                    </div>
+                </div>
+            </div>
+        `;
+    }, 500);
+}
+
+document.getElementById('new-thread-form').addEventListener('submit', function(e) {
+    e.preventDefault();
+    
+    const formData = {
+        subject: document.getElementById('thread-subject').value,
+        order_id: document.getElementById('thread-order').value || null,
+        message: document.getElementById('thread-message').value
+    };
+    
+    fetch('/api/support/threads', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(formData)
+    })
+    .then(r => r.json())
+    .then(data => {
+        if (data.success) {
+            showNotification('Demande de support créée avec succès !', 'success');
+            closeNewThreadModal();
+            setTimeout(() => location.reload(), 600);
+        } else {
+            showNotification(data.error || 'Erreur lors de la création', 'error');
+        }
+    })
+    .catch(err => {
+        console.error(err);
+        showNotification('Erreur de connexion', 'error');
+    });
+});
+
+document.getElementById('reply-form').addEventListener('submit', function(e) {
+    e.preventDefault();
+    
+    const message = document.getElementById('reply-message').value;
+    
+    // Ici vous pourriez faire un appel API pour envoyer la réponse
+    showNotification('Message envoyé !', 'success');
+    cancelReply();
+    
+    // Ajouter le message à l'affichage
+    const messagesContainer = document.getElementById('thread-messages');
+    const newMessage = document.createElement('div');
+    newMessage.className = 'message user';
+    newMessage.innerHTML = `
+        <div class="message-content">
+            <div class="message-header">
+                <span class="message-author">Vous</span>
+                <span class="message-time">${new Date().toLocaleString('fr-FR')}</span>
+            </div>
+            <div class="message-body">${message}</div>
+        </div>
+    `;
+    messagesContainer.appendChild(newMessage);
+    messagesContainer.scrollTop = messagesContainer.scrollHeight;
+});
+
+// Fermer les modals en cliquant à l'extérieur
+document.getElementById('new-thread-modal').addEventListener('click', function(e) {
+    if (e.target === this) {
+        closeNewThreadModal();
+    }
+});
+
+document.getElementById('thread-modal').addEventListener('click', function(e) {
+    if (e.target === this) {
+        closeThreadModal();
+    }
+});
+</script>
+{% endblock %}

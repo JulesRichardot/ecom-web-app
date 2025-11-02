@@ -1,0 +1,396 @@
+{% extends "base.html" %}
+
+{% block title %}Panier - Sneakly{% endblock %}
+
+{% block content %}
+<div class="container">
+    <div class="page-header">
+        <h1><i class="fas fa-shopping-cart"></i> Mon Panier</h1>
+        <p>Vérifiez vos articles avant de passer commande</p>
+    </div>
+    
+    <div class="cart-container {% if not cart.items %}cart-container-empty{% endif %}">
+        <div class="cart-items {% if not cart.items %}cart-items-empty{% endif %}" id="cart-items">
+            {% if cart.items %}
+                {% for item_id, item in cart.items.items() %}
+                    {% set product = products.get(item.product_id) %}
+                    {% if product %}
+                    <div class="cart-item" data-product-id="{{ item.product_id }}">
+                        <div class="item-image">
+                            <i class="fas fa-image"></i>
+                        </div>
+                        <div class="item-details">
+                            <h3 class="item-name">{{ product.name }}</h3>
+                            <p class="item-description">{{ product.description }}</p>
+                            <div class="item-price">
+                                <span class="unit-price">{{ "%.2f"|format(product.price_cents / 100) }}€</span>
+                                <span class="item-total">{{ "%.2f"|format((product.price_cents * item.quantity) / 100) }}€</span>
+                            </div>
+                        </div>
+                        <div class="item-quantity">
+                            <div class="quantity-controls">
+                                <button class="qty-btn minus" onclick="updateQuantity('{{ item.product_id }}', -1)">
+                                    <i class="fas fa-minus"></i>
+                                </button>
+                                <span class="qty-display">{{ item.quantity }}</span>
+                                <button class="qty-btn plus" onclick="updateQuantity('{{ item.product_id }}', 1)">
+                                    <i class="fas fa-plus"></i>
+                                </button>
+                            </div>
+                            <button class="remove-item" onclick="removeItem('{{ item.product_id }}')">
+                                <i class="fas fa-trash"></i>
+                                Supprimer
+                            </button>
+                        </div>
+                    </div>
+                    {% endif %}
+                {% endfor %}
+            {% else %}
+                <div class="empty-cart">
+                    <i class="fas fa-shopping-cart"></i>
+                    <h3>Votre panier est vide</h3>
+                    <p>Découvrez nos produits et ajoutez-les à votre panier</p>
+                    <a href="{{ url_for('index') }}" class="btn btn-primary">
+                        <i class="fas fa-shopping-bag"></i>
+                        Voir les produits
+                    </a>
+                </div>
+            {% endif %}
+        </div>
+        
+        {% if cart.items %}
+        <div class="cart-summary">
+            <div class="summary-card">
+                <h3>Résumé de la commande</h3>
+                
+                <div class="summary-line">
+                    <span>Sous-total</span>
+                    <span id="subtotal">{{ "%.2f"|format(total / 100) }}€</span>
+                </div>
+                
+                <div class="summary-line">
+                    <span>Livraison</span>
+                    <span class="free">Gratuite</span>
+                </div>
+                
+                <div class="summary-line total">
+                    <span>Total</span>
+                    <span id="total">{{ "%.2f"|format(total / 100) }}€</span>
+                </div>
+                
+                <button class="btn btn-primary btn-full checkout-btn" onclick="proceedToCheckout()">
+                    <i class="fas fa-credit-card"></i>
+                    Passer la commande
+                </button>
+                
+                <div class="payment-methods">
+                    <p>Moyens de paiement acceptés :</p>
+                    <div class="payment-icons">
+                        <i class="fab fa-cc-visa"></i>
+                        <i class="fab fa-cc-mastercard"></i>
+                        <i class="fab fa-cc-paypal"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+        {% endif %}
+    </div>
+</div>
+
+<!-- Modal de paiement -->
+<div id="payment-modal" class="modal">
+    <div class="modal-content">
+        <div class="modal-header">
+            <h2><i class="fas fa-credit-card"></i> Paiement</h2>
+            <button class="modal-close" onclick="closePaymentModal()">
+                <i class="fas fa-times"></i>
+            </button>
+        </div>
+        
+        <div class="modal-body">
+            <form id="payment-form">
+                <div class="form-group">
+                    <label for="card-number">Numéro de carte</label>
+                    <input type="text" id="card-number" placeholder="4242 4242 4242 4242" maxlength="19">
+                </div>
+                
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="exp-month">Mois</label>
+                        <select id="exp-month">
+                            {% for month in range(1, 13) %}
+                                <option value="{{ month }}" {% if month == 12 %}selected{% endif %}>{{ "%02d"|format(month) }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="exp-year">Année</label>
+                        <select id="exp-year">
+                            {% for year in range(2024, 2035) %}
+                                <option value="{{ year }}" {% if year == 2030 %}selected{% endif %}>{{ year }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="cvc">CVC</label>
+                        <input type="text" id="cvc" placeholder="123" maxlength="3">
+                    </div>
+                </div>
+                
+                <div class="payment-total">
+                    <span>Total à payer : <strong id="payment-total">{{ "%.2f"|format(total / 100) }}€</strong></span>
+                </div>
+                
+                <button type="submit" class="btn btn-primary btn-full">
+                    <i class="fas fa-lock"></i>
+                    Payer maintenant
+                </button>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+let currentOrderId = null;
+let quantityUpdateInProgress = false; // Lock to prevent multiple simultaneous updates
+
+function updateQuantity(productId, change) {
+    // Prevent multiple simultaneous updates
+    if (quantityUpdateInProgress) {
+        return;
+    }
+    
+    const display = document.querySelector(`[data-product-id="${productId}"] .qty-display`);
+    const container = document.querySelector(`[data-product-id="${productId}"]`);
+    const buttons = container.querySelectorAll('.qty-btn');
+    
+    if (!display) {
+        return;
+    }
+    
+    // Disable buttons and set loading state
+    quantityUpdateInProgress = true;
+    buttons.forEach(btn => btn.disabled = true);
+    
+    const action = change > 0 ? '/add_to_cart' : '/remove_from_cart';
+    const qty = Math.abs(change);
+    
+    fetch(action, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+            product_id: productId,
+            quantity: qty
+        })
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            // Use the quantity from server response, not calculated client-side
+            if (data.product_quantity !== undefined) {
+                display.textContent = data.product_quantity;
+            }
+            // Update cart badge with server value
+            if (data.total_items !== undefined) {
+                const cartCountElement = document.getElementById('cart-count');
+                if (cartCountElement) {
+                    cartCountElement.textContent = data.total_items;
+                }
+            }
+            updateCartTotals();
+        } else if (data.error) {
+            showNotification(data.error, 'error');
+            // Refresh cart count to sync with server
+            updateCartCount();
+        }
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        showNotification('Erreur de connexion', 'error');
+        // Refresh cart count to sync with server
+        updateCartCount();
+    })
+    .finally(() => {
+        // Re-enable buttons
+        quantityUpdateInProgress = false;
+        buttons.forEach(btn => btn.disabled = false);
+    });
+}
+
+function removeItem(productId) {
+    if (confirm('Êtes-vous sûr de vouloir supprimer cet article ?')) {
+        fetch('/remove_from_cart', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+                product_id: productId,
+                quantity: 999 // Supprime complètement
+            })
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                document.querySelector(`[data-product-id="${productId}"]`).remove();
+                updateCartTotals();
+                updateCartCount();
+                
+                // Vérifier si le panier est vide
+                if (document.querySelectorAll('.cart-item').length === 0) {
+                    location.reload();
+                }
+            }
+        })
+        .catch(error => console.error('Error:', error));
+    }
+}
+
+function updateCartTotals() {
+    fetch('/api/cart')
+    .then(response => response.json())
+    .then(data => {
+        if (data.total_cents) {
+            const total = (data.total_cents / 100).toFixed(2);
+            document.getElementById('subtotal').textContent = total + '€';
+            document.getElementById('total').textContent = total + '€';
+            document.getElementById('payment-total').textContent = total + '€';
+        }
+    })
+    .catch(error => console.error('Error:', error));
+}
+
+function proceedToCheckout() {
+    fetch('/checkout', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+        },
+        credentials: 'same-origin'
+    })
+    .then(async response => {
+        const contentType = response.headers.get('content-type');
+        
+        if (!contentType || !contentType.includes('application/json')) {
+            // Si on reçoit du HTML au lieu de JSON, c'est probablement une redirection ou une erreur
+            const text = await response.text();
+            console.error('Réponse non-JSON reçue:', text.substring(0, 200));
+            
+            if (response.status === 401 || response.status === 403) {
+                throw new Error('Vous devez être connecté pour passer une commande');
+            }
+            throw new Error('Erreur serveur inattendue');
+        }
+        
+        if (!response.ok) {
+            const err = await response.json();
+            throw new Error(err.error || 'Erreur lors de la commande');
+        }
+        
+        return response.json();
+    })
+    .then(data => {
+        if (data.success) {
+            currentOrderId = data.order_id;
+            document.getElementById('payment-modal').style.display = 'flex';
+        } else {
+            showNotification(data.error || 'Erreur lors de la commande', 'error');
+        }
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        showNotification(error.message || 'Erreur de connexion', 'error');
+    });
+}
+
+function closePaymentModal() {
+    document.getElementById('payment-modal').style.display = 'none';
+}
+
+document.getElementById('payment-form').addEventListener('submit', function(e) {
+    e.preventDefault();
+    
+    if (!currentOrderId) {
+        showNotification('Erreur: Aucune commande en cours', 'error');
+        return;
+    }
+    
+    const cardNumberRaw = document.getElementById('card-number').value;
+    const cardNumber = cardNumberRaw.replace(/\s/g, '');
+    const expMonth = parseInt(document.getElementById('exp-month').value);
+    const expYear = parseInt(document.getElementById('exp-year').value);
+    const cvc = document.getElementById('cvc').value;
+
+    // Validations côté client
+    const luhn = (num) => {
+        let sum = 0, shouldDouble = false;
+        for (let i = num.length - 1; i >= 0; i--) {
+            let digit = parseInt(num.charAt(i));
+            if (shouldDouble) {
+                digit *= 2;
+                if (digit > 9) digit -= 9;
+            }
+            sum += digit;
+            shouldDouble = !shouldDouble;
+        }
+        return sum % 10 === 0;
+    };
+    const now = new Date();
+    const validCard = /^\d{13,19}$/.test(cardNumber) && luhn(cardNumber);
+    const validCvc = /^\d{3,4}$/.test(cvc);
+    const validDate = (expMonth >= 1 && expMonth <= 12) && (expYear > now.getFullYear() || (expYear === now.getFullYear() && expMonth >= (now.getMonth()+1)));
+    if (!validCard) return showNotification('Numéro de carte invalide', 'error');
+    if (!validDate) return showNotification('Date d\'expiration invalide', 'error');
+    if (!validCvc) return showNotification('CVC invalide', 'error');
+    
+    fetch('/payment', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+            order_id: currentOrderId,
+            card_number: cardNumber,
+            exp_month: expMonth,
+            exp_year: expYear,
+            cvc: cvc
+        })
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            showNotification('Paiement réussi ! Votre commande est confirmée.', 'success');
+            setTimeout(() => {
+                window.location.href = '/orders';
+            }, 2000);
+        } else {
+            showNotification(data.error || 'Erreur de paiement', 'error');
+        }
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        showNotification('Erreur de connexion', 'error');
+    });
+});
+
+// Formatage du numéro de carte
+document.getElementById('card-number').addEventListener('input', function(e) {
+    let value = e.target.value.replace(/\s/g, '');
+    let formattedValue = value.replace(/(.{4})/g, '$1 ').trim();
+    e.target.value = formattedValue;
+});
+
+// Fermer le modal en cliquant à l'extérieur
+document.getElementById('payment-modal').addEventListener('click', function(e) {
+    if (e.target === this) {
+        closePaymentModal();
+    }
+});
+</script>
+{% endblock %}
