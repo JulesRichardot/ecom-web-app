@@ -190,23 +190,12 @@ Le projet suit une architecture en couches avec séparation des responsabilités
    cd ecom-web-app-main
    ```
 
-2. **Créer un environnement virtuel** (recommandé)
-   ```bash
-   # Windows
-   python -m venv venv
-   venv\Scripts\activate
-
-   # Linux/Mac
-   python3 -m venv venv
-   source venv/bin/activate
-   ```
-
-3. **Installer les dépendances**
+2. **Installer les dépendances**
    ```bash
    pip install -r requirements.txt
    ```
 
-4. **Installer les dépendances de développement** (pour les tests)
+3. **Installer les dépendances de développement** (pour les tests)
    ```bash
    pip install -r requirements-dev.txt
    ```
