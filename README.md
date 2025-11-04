@@ -470,29 +470,6 @@ Ce projet a été développé pour appliquer les concepts vus en cours de **Qual
 - API REST complète
 - Déploiement en production (Heroku, AWS, etc.)
 
-## 🤝 Contribution
-
-Les suggestions d'amélioration sont les bienvenues !
-
-Pour contribuer :
-
-1. Fork le projet
-2. Créer une branche (`git checkout -b feature/amélioration`)
-3. Commiter les changements (`git commit -m 'feat: ajout d'une amélioration'`)
-4. Pousser vers la branche (`git push origin feature/amélioration`)
-5. Ouvrir une Pull Request
-
-## 📄 Licence
-
-Ce projet est à but pédagogique et démontre l'application des bonnes pratiques de développement logiciel.
-
-## 📞 Support
-
-Pour toute question sur le projet :
-
-- Créer une issue sur le dépôt GitHub
-- Consulter la documentation dans le code
-- Examiner les tests pour comprendre le comportement attendu
 
 ---
 
