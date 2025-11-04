@@ -332,7 +332,6 @@ ecom-web-app-main/
 ├── requirements-dev.txt      # Dépendances développement/test
 ├── pytest.ini               # Configuration pytest
 ├── setup.cfg                # Configuration linters (flake8, pylint)
-├── config.env.example        # Exemple de configuration
 │
 ├── static/                   # Fichiers statiques
 │   ├── css/
