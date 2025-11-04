@@ -15,7 +15,7 @@ class TestAuthService:
         """Test successful user registration."""
         user = auth_service.register(
             email="newuser@example.com",
-            password="password123",
+            password="Password123!",
             first_name="John",
             last_name="Doe",
             address="123 Main St"
@@ -32,7 +32,7 @@ class TestAuthService:
         """Test that registering with duplicate email raises ValueError."""
         auth_service.register(
             email="duplicate@example.com",
-            password="password123",
+            password="Password123!",
             first_name="John",
             last_name="Doe",
             address="123 Main St"
@@ -68,7 +68,7 @@ class TestAuthService:
     
     def test_logout(self, auth_service, test_user, sessions):
         """Test logout invalidates session token."""
-        token = auth_service.login("test@example.com", "testpassword")
+        token = auth_service.login("test@example.com", "TestPassword123!")
         
         # Verify token is valid
         user_id = sessions.get_user_id(token)
