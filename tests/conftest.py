@@ -133,7 +133,7 @@ def test_user(auth_service):
     """Create a test user for testing."""
     return auth_service.register(
         email="test@example.com",
-        password="testpassword",
+        password="TestPassword123!",  # Strong password that meets security requirements
         first_name="Test",
         last_name="User",
         address="123 Test Street"

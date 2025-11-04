@@ -53,10 +53,11 @@ class User:
     def update_profile(self, **fields):
         """Update user profile fields (allows partial updates).
         
-        Prevents modification of sensitive fields like id, email, password_hash.
+        Allows modification of first_name, last_name, address, and email.
+        Prevents modification of id and password_hash (use separate method for password).
         """
         for k, v in fields.items():
-            if hasattr(self, k) and k not in {"id", "email", "password_hash"}:
+            if hasattr(self, k) and k not in {"id", "password_hash"}:
                 setattr(self, k, v)
 
 
@@ -254,6 +255,15 @@ class UserRepository:
 
     def get_by_email(self, email: str) -> Optional[User]:
         return self._by_email.get(email.lower())
+    
+    def update(self, user: User):
+        """Update user in repository. Handles email changes."""
+        old_user = self._by_id.get(user.id)
+        if old_user and old_user.email.lower() != user.email.lower():
+            # Remove old email mapping if email changed
+            self._by_email.pop(old_user.email.lower(), None)
+        self._by_id[user.id] = user
+        self._by_email[user.email.lower()] = user
 
 
 class ProductRepository:
@@ -354,14 +364,86 @@ class ThreadRepository:
 # =========================
 
 class PasswordHasher:
+    """Secure password hashing using bcrypt.
+    
+    Supports both bcrypt (new) and SHA256 (legacy) for backward compatibility.
+    Automatically migrates SHA256 hashes to bcrypt on successful login.
+    """
+    
     @staticmethod
     def hash(password: str) -> str:
-        # Simple (à remplacer par bcrypt/argon2)
-        return f"sha256::{hashlib.sha256(password.encode()).hexdigest()}"
-
+        """Hash password using bcrypt with salt.
+        
+        Returns a bcrypt hash string that can be verified later.
+        """
+        import bcrypt
+        # Generate salt and hash password (bcrypt handles salting automatically)
+        salt = bcrypt.gensalt(rounds=12)  # 12 rounds = good balance between security and performance
+        hashed = bcrypt.hashpw(password.encode('utf-8'), salt)
+        return hashed.decode('utf-8')
+    
     @staticmethod
     def verify(password: str, stored_hash: str) -> bool:
-        return PasswordHasher.hash(password) == stored_hash
+        """Verify password against stored hash.
+        
+        Supports both bcrypt (new) and SHA256 (legacy) for backward compatibility.
+        Returns True if password matches, False otherwise.
+        """
+        import bcrypt
+        import hashlib
+        
+        # Check if it's a legacy SHA256 hash
+        if stored_hash.startswith('sha256::'):
+            # Legacy SHA256 verification
+            expected_hash = f"sha256::{hashlib.sha256(password.encode()).hexdigest()}"
+            return expected_hash == stored_hash
+        
+        # Modern bcrypt verification
+        try:
+            return bcrypt.checkpw(password.encode('utf-8'), stored_hash.encode('utf-8'))
+        except (ValueError, TypeError):
+            # Invalid hash format
+            return False
+    
+    @staticmethod
+    def needs_rehash(stored_hash: str) -> bool:
+        """Check if password hash needs to be rehashed (legacy SHA256).
+        
+        Returns True if hash is legacy SHA256 and should be migrated to bcrypt.
+        """
+        return stored_hash.startswith('sha256::')
+    
+    @staticmethod
+    def validate_password_strength(password: str):
+        """Validate password strength requirements.
+        
+        Raises ValueError if password doesn't meet security requirements:
+        - Minimum 8 characters
+        - At least one uppercase letter
+        - At least one lowercase letter
+        - At least one digit
+        - At least one special character
+        """
+        if len(password) < 8:
+            raise ValueError("Le mot de passe doit contenir au moins 8 caractères.")
+        
+        has_upper = any(c.isupper() for c in password)
+        has_lower = any(c.islower() for c in password)
+        has_digit = any(c.isdigit() for c in password)
+        has_special = any(c in "!@#$%^&*()_+-=[]{}|;:,.<>?" for c in password)
+        
+        errors = []
+        if not has_upper:
+            errors.append("une majuscule")
+        if not has_lower:
+            errors.append("une minuscule")
+        if not has_digit:
+            errors.append("un chiffre")
+        if not has_special:
+            errors.append("un caractère spécial (!@#$%^&*...)")
+        
+        if errors:
+            raise ValueError(f"Le mot de passe doit contenir {', '.join(errors)}.")
 
 
 class SessionManager:
@@ -387,8 +469,13 @@ class AuthService:
         self.sessions = sessions
 
     def register(self, email: str, password: str, first_name: str, last_name: str, address: str) -> User:
+        """Register a new user with password strength validation."""
         if self.users.get_by_email(email):
             raise ValueError("Email déjà utilisé.")
+        
+        # Validate password strength
+        PasswordHasher.validate_password_strength(password)
+        
         user = User(
             id=str(uuid.uuid4()),
             email=email,
@@ -401,9 +488,19 @@ class AuthService:
         return user
 
     def login(self, email: str, password: str) -> str:
+        """Authenticate user and create session.
+        
+        Automatically migrates legacy SHA256 password hashes to bcrypt on successful login.
+        """
         user = self.users.get_by_email(email)
         if not user or not PasswordHasher.verify(password, user.password_hash):
             raise ValueError("Identifiants invalides.")
+        
+        # Migrate legacy SHA256 hash to bcrypt on successful login
+        if PasswordHasher.needs_rehash(user.password_hash):
+            user.password_hash = PasswordHasher.hash(password)
+            self.users.update(user)
+        
         return self.sessions.create_session(user.id)
 
     def logout(self, token: str):
@@ -705,11 +802,11 @@ if __name__ == "__main__":
     p2 = Product(id=str(uuid.uuid4()), name="Sweat Capuche", description="Molleton", price_cents=4999, stock_qty=50)
     products.add(p1); products.add(p2)
 
-    # Données de test
-    client = auth.register("client@shop.test", "secret", "Alice", "Martin", "12 Rue des Fleurs")
+    # Données de test (password must meet security requirements)
+    client = auth.register("client@shop.test", "Secret123!", "Alice", "Martin", "12 Rue des Fleurs")
 
     # Données de test
-    token = auth.login("client@shop.test", "secret")
+    token = auth.login("client@shop.test", "Secret123!")
     user_id = sessions.get_user_id(token)
 
     # Affichage catalogue

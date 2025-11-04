@@ -28,7 +28,7 @@ def authenticated_client(client):
     try:
         user = auth.register(
             email="test@example.com",
-            password="testpassword",
+            password="TestPassword123!",
             first_name="Test",
             last_name="User",
             address="123 Test St"
@@ -40,7 +40,7 @@ def authenticated_client(client):
     # Login via client - this will set session['user_id'] and session['user_email']
     response = client.post('/login', data={
         'email': 'test@example.com',
-        'password': 'testpassword'
+        'password': 'TestPassword123!'
     }, follow_redirects=False)
     
     # After login, the session should be preserved in the client

@@ -251,7 +251,7 @@ products.add(p7)
 products.add(p8)
 
 # Initialize test user (regular customer only)
-client = auth.register("client@shop.test", "secret", "Alice", "Martin", "12 Rue des Fleurs")
+client = auth.register("client@shop.test", "Secret123!", "Alice", "Martin", "12 Rue des Fleurs")
 
 # ============================================================================
 # AUTHENTICATION HELPER FUNCTIONS
@@ -380,19 +380,32 @@ def register():
     
     GET: Display registration form
     POST: Create new user account, redirect to login
+    
+    Validates password strength and email format before registration.
     """
     if request.method == 'POST':
-        email = request.form['email']
-        password = request.form['password']
-        first_name = request.form['first_name']
-        last_name = request.form['last_name']
-        address = request.form['address']
-        try:
-            user = auth.register(email, password, first_name, last_name, address)
-            flash('Inscription réussie ! Vous pouvez maintenant vous connecter.', 'success')
-            return redirect(url_for('login'))
-        except ValueError as e:
-            flash(str(e), 'error')
+        email = request.form.get('email', '').strip()
+        password = request.form.get('password', '')
+        first_name = request.form.get('first_name', '').strip()
+        last_name = request.form.get('last_name', '').strip()
+        address = request.form.get('address', '').strip()
+        
+        # Basic validation
+        if not all([email, password, first_name, last_name, address]):
+            flash('Tous les champs sont requis.', 'error')
+        else:
+            # Validate email format
+            import re
+            email_pattern = r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$'
+            if not re.match(email_pattern, email):
+                flash('Format email invalide.', 'error')
+            else:
+                try:
+                    user = auth.register(email, password, first_name, last_name, address)
+                    flash('Inscription réussie ! Vous pouvez maintenant vous connecter.', 'success')
+                    return redirect(url_for('login'))
+                except ValueError as e:
+                    flash(str(e), 'error')
     return render_template('register.html')
 
 @app.route('/logout')
@@ -686,6 +699,129 @@ def api_cart():
         'items': cart_items,
         'total_cents': cart_svc.cart_total(user.id)
     })
+
+
+@app.route('/api/profile/update', methods=['POST'])
+def api_profile_update():
+    """Update user profile (AJAX endpoint).
+    
+    Validates and updates user profile information including email and password.
+    Accepts JSON: {first_name, last_name, address, email, email_confirm, current_password, new_password, new_password_confirm}
+    Returns updated user data on success.
+    """
+    user = require_auth()
+    if not user:
+        return jsonify({'error': 'Non authentifié'}), 401
+    
+    data = request.get_json() or {}
+    
+    # Validation des champs
+    first_name = data.get('first_name', '').strip()
+    last_name = data.get('last_name', '').strip()
+    address = data.get('address', '').strip()
+    new_email = data.get('email', '').strip()
+    email_confirm = data.get('email_confirm', '').strip()
+    current_password = data.get('current_password', '').strip()
+    new_password = data.get('new_password', '').strip()
+    new_password_confirm = data.get('new_password_confirm', '').strip()
+    
+    # Validation du mot de passe actuel
+    from main import PasswordHasher
+    if not current_password:
+        return jsonify({'error': 'Mot de passe actuel requis pour confirmer les modifications'}), 400
+    
+    if not PasswordHasher.verify(current_password, user.password_hash):
+        return jsonify({'error': 'Mot de passe actuel incorrect'}), 400
+    
+    # Validation prénom (2-50 caractères, lettres, espaces, tirets)
+    if not first_name:
+        return jsonify({'error': 'Le prénom est requis'}), 400
+    if len(first_name) < 2 or len(first_name) > 50:
+        return jsonify({'error': 'Le prénom doit contenir entre 2 et 50 caractères'}), 400
+    if not all(c.isalpha() or c in (' ', '-', "'") for c in first_name):
+        return jsonify({'error': 'Le prénom ne peut contenir que des lettres, espaces, tirets et apostrophes'}), 400
+    
+    # Validation nom (2-50 caractères, lettres, espaces, tirets)
+    if not last_name:
+        return jsonify({'error': 'Le nom est requis'}), 400
+    if len(last_name) < 2 or len(last_name) > 50:
+        return jsonify({'error': 'Le nom doit contenir entre 2 et 50 caractères'}), 400
+    if not all(c.isalpha() or c in (' ', '-', "'") for c in last_name):
+        return jsonify({'error': 'Le nom ne peut contenir que des lettres, espaces, tirets et apostrophes'}), 400
+    
+    # Validation adresse (10-200 caractères)
+    if not address:
+        return jsonify({'error': "L'adresse est requise"}), 400
+    if len(address) < 10 or len(address) > 200:
+        return jsonify({'error': "L'adresse doit contenir entre 10 et 200 caractères"}), 400
+    
+    # Validation email si modifié
+    if new_email and new_email != user.email:
+        # Validation format email
+        import re
+        email_pattern = r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$'
+        if not re.match(email_pattern, new_email):
+            return jsonify({'error': 'Format email invalide'}), 400
+        
+        # Vérifier que les deux emails correspondent
+        if new_email != email_confirm:
+            return jsonify({'error': 'Les adresses email ne correspondent pas'}), 400
+        
+        # Vérifier que l'email n'est pas déjà utilisé
+        existing_user = users.get_by_email(new_email)
+        if existing_user:
+            return jsonify({'error': 'Cette adresse email est déjà utilisée'}), 400
+    elif new_email and new_email == user.email:
+        # Si l'email est identique, on ne le modifie pas
+        new_email = None
+    
+    # Validation nouveau mot de passe si modifié
+    if new_password:
+        # Vérifier que les deux mots de passe correspondent
+        if new_password != new_password_confirm:
+            return jsonify({'error': 'Les mots de passe ne correspondent pas'}), 400
+        
+        # Valider la force du nouveau mot de passe
+        try:
+            PasswordHasher.validate_password_strength(new_password)
+        except ValueError as e:
+            return jsonify({'error': str(e)}), 400
+    
+    try:
+        # Mettre à jour le profil
+        user.update_profile(
+            first_name=first_name,
+            last_name=last_name,
+            address=address
+        )
+        
+        # Mettre à jour l'email si modifié
+        if new_email:
+            user.email = new_email
+        
+        # Mettre à jour le mot de passe si modifié
+        if new_password:
+            user.password_hash = PasswordHasher.hash(new_password)
+        
+        # Sauvegarder les modifications
+        users.update(user)
+        
+        # Mettre à jour la session si l'email a changé
+        if new_email and new_email != session.get('user_email'):
+            session['user_email'] = user.email
+        
+        return jsonify({
+            'success': True,
+            'message': 'Profil mis à jour avec succès',
+            'user': {
+                'first_name': user.first_name,
+                'last_name': user.last_name,
+                'email': user.email,
+                'address': user.address
+            }
+        })
+    except Exception as e:
+        return jsonify({'error': f'Erreur lors de la mise à jour: {str(e)}'}), 500
 
 # ============================================================================
 # APPLICATION ENTRY POINT

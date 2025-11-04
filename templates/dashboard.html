@@ -21,15 +21,15 @@
             <div class="card-content">
                 <div class="info-item">
                     <label>Nom complet</label>
-                    <span>{{ user.first_name }} {{ user.last_name }}</span>
+                    <span data-first-name="{{ user.first_name }}" data-last-name="{{ user.last_name }}">{{ user.first_name }} {{ user.last_name }}</span>
                 </div>
                 <div class="info-item">
                     <label>Email</label>
-                    <span>{{ user.email }}</span>
+                    <span data-email="{{ user.email }}">{{ user.email }}</span>
                 </div>
                 <div class="info-item">
                     <label>Adresse</label>
-                    <span>{{ user.address }}</span>
+                    <span data-address="{{ user.address }}">{{ user.address }}</span>
                 </div>
             </div>
         </div>
@@ -145,30 +145,66 @@
             <form id="profile-form">
                 <div class="form-row">
                     <div class="form-group">
-                        <label for="edit-first-name">Prénom</label>
-                        <input type="text" id="edit-first-name" value="{{ user.first_name }}" required>
+                        <label for="edit-first-name">Prénom *</label>
+                        <input type="text" id="edit-first-name" value="{{ user.first_name }}" 
+                               minlength="2" maxlength="50" pattern="[a-zA-ZÀ-ÿ\s\-']+" required>
+                        <small class="form-error" id="error-first-name"></small>
                     </div>
                     <div class="form-group">
-                        <label for="edit-last-name">Nom</label>
-                        <input type="text" id="edit-last-name" value="{{ user.last_name }}" required>
+                        <label for="edit-last-name">Nom *</label>
+                        <input type="text" id="edit-last-name" value="{{ user.last_name }}" 
+                               minlength="2" maxlength="50" pattern="[a-zA-ZÀ-ÿ\s\-']+" required>
+                        <small class="form-error" id="error-last-name"></small>
                     </div>
                 </div>
                 
                 <div class="form-group">
-                    <label for="edit-address">Adresse</label>
-                    <textarea id="edit-address" rows="3" required>{{ user.address }}</textarea>
+                    <label for="edit-email">Nouvelle adresse email</label>
+                    <input type="email" id="edit-email" value="{{ user.email }}" 
+                           placeholder="nouvelle@email.com">
+                    <small class="form-hint">Laissez vide si vous ne souhaitez pas modifier l'email</small>
+                    <small class="form-error" id="error-email"></small>
                 </div>
                 
                 <div class="form-group">
-                    <label for="current-password">Mot de passe actuel (pour confirmer)</label>
-                    <input type="password" id="current-password" placeholder="Votre mot de passe actuel">
+                    <label for="edit-email-confirm">Confirmer la nouvelle adresse email</label>
+                    <input type="email" id="edit-email-confirm" value="{{ user.email }}" 
+                           placeholder="nouvelle@email.com">
+                    <small class="form-error" id="error-email-confirm"></small>
+                </div>
+                
+                <div class="form-group">
+                    <label for="edit-address">Adresse *</label>
+                    <textarea id="edit-address" rows="3" minlength="10" maxlength="200" required>{{ user.address }}</textarea>
+                    <small class="form-hint">Entre 10 et 200 caractères</small>
+                    <small class="form-error" id="error-address"></small>
+                </div>
+                
+                <div class="form-group">
+                    <label for="current-password">Mot de passe actuel *</label>
+                    <input type="password" id="current-password" placeholder="Votre mot de passe actuel" required>
+                    <small class="form-hint">Requis pour confirmer les modifications</small>
+                    <small class="form-error" id="error-password"></small>
+                </div>
+                
+                <div class="form-group">
+                    <label for="edit-new-password">Nouveau mot de passe</label>
+                    <input type="password" id="edit-new-password" placeholder="Nouveau mot de passe">
+                    <small class="form-hint">Laissez vide si vous ne souhaitez pas modifier le mot de passe. Minimum 8 caractères, majuscule, minuscule, chiffre et caractère spécial</small>
+                    <small class="form-error" id="error-new-password"></small>
+                </div>
+                
+                <div class="form-group">
+                    <label for="edit-new-password-confirm">Confirmer le nouveau mot de passe</label>
+                    <input type="password" id="edit-new-password-confirm" placeholder="Confirmer le nouveau mot de passe">
+                    <small class="form-error" id="error-new-password-confirm"></small>
                 </div>
                 
                 <div class="form-actions">
                     <button type="button" class="btn btn-secondary" onclick="closeProfileModal()">
                         Annuler
                     </button>
-                    <button type="submit" class="btn btn-primary">
+                    <button type="submit" class="btn btn-primary" id="submit-btn">
                         <i class="fas fa-save"></i>
                         Sauvegarder
                     </button>
@@ -181,28 +217,246 @@
 
 {% block extra_js %}
 <script>
+function resetFormValues() {
+    // Récupérer les valeurs actuelles depuis les attributs data-* ou depuis l'affichage
+    const nameSpan = document.querySelector('.info-item:nth-child(1) span');
+    const emailSpan = document.querySelector('.info-item:nth-child(2) span');
+    const addressSpan = document.querySelector('.info-item:nth-child(3) span');
+    
+    // Utiliser les attributs data-* si disponibles, sinon le texte affiché
+    const firstName = nameSpan?.dataset.firstName || nameSpan?.textContent.trim().split(' ').slice(0, -1).join(' ') || '{{ user.first_name }}';
+    const lastName = nameSpan?.dataset.lastName || nameSpan?.textContent.trim().split(' ').pop() || '{{ user.last_name }}';
+    const currentEmail = emailSpan?.dataset.email || emailSpan?.textContent.trim() || '{{ user.email }}';
+    const currentAddress = addressSpan?.dataset.address || addressSpan?.textContent.trim() || '{{ user.address }}';
+    
+    // Réinitialiser toutes les valeurs avec les données actuelles
+    document.getElementById('edit-first-name').value = firstName;
+    document.getElementById('edit-last-name').value = lastName;
+    document.getElementById('edit-address').value = currentAddress;
+    document.getElementById('edit-email').value = currentEmail;
+    document.getElementById('edit-email-confirm').value = currentEmail;
+    document.getElementById('current-password').value = '';
+    document.getElementById('edit-new-password').value = '';
+    document.getElementById('edit-new-password-confirm').value = '';
+}
+
 function editProfile() {
+    // Réinitialiser les valeurs avec les données actuelles
+    resetFormValues();
+    
+    // Réinitialiser les erreurs
+    clearErrors();
+    
+    // Afficher le modal
     document.getElementById('profile-modal').style.display = 'flex';
 }
 
 function closeProfileModal() {
+    // Réinitialiser les valeurs avant de fermer pour la prochaine ouverture
+    resetFormValues();
+    
+    // Fermer le modal
     document.getElementById('profile-modal').style.display = 'none';
+    
+    // Réinitialiser les erreurs
+    clearErrors();
 }
 
-document.getElementById('profile-form').addEventListener('submit', function(e) {
+function clearErrors() {
+    document.querySelectorAll('.form-error').forEach(el => el.textContent = '');
+    document.querySelectorAll('input, textarea').forEach(el => el.classList.remove('error'));
+}
+
+function showError(fieldId, message) {
+    const field = document.getElementById(fieldId);
+    // Gérer les différents formats d'ID pour les messages d'erreur
+    let errorId = fieldId.replace('edit-', 'error-');
+    // Cas spécial pour current-password
+    if (fieldId === 'current-password') {
+        errorId = 'error-password';
+    }
+    const errorEl = document.getElementById(errorId);
+    if (field) field.classList.add('error');
+    if (errorEl) errorEl.textContent = message;
+}
+
+function validateForm() {
+    clearErrors();
+    let isValid = true;
+    
+    // Validation prénom
+    const firstName = document.getElementById('edit-first-name').value.trim();
+    if (!firstName) {
+        showError('edit-first-name', 'Le prénom est requis');
+        isValid = false;
+    } else if (firstName.length < 2 || firstName.length > 50) {
+        showError('edit-first-name', 'Le prénom doit contenir entre 2 et 50 caractères');
+        isValid = false;
+    } else if (!/^[a-zA-ZÀ-ÿ\s\-']+$/.test(firstName)) {
+        showError('edit-first-name', 'Le prénom ne peut contenir que des lettres, espaces, tirets et apostrophes');
+        isValid = false;
+    }
+    
+    // Validation nom
+    const lastName = document.getElementById('edit-last-name').value.trim();
+    if (!lastName) {
+        showError('edit-last-name', 'Le nom est requis');
+        isValid = false;
+    } else if (lastName.length < 2 || lastName.length > 50) {
+        showError('edit-last-name', 'Le nom doit contenir entre 2 et 50 caractères');
+        isValid = false;
+    } else if (!/^[a-zA-ZÀ-ÿ\s\-']+$/.test(lastName)) {
+        showError('edit-last-name', 'Le nom ne peut contenir que des lettres, espaces, tirets et apostrophes');
+        isValid = false;
+    }
+    
+    // Validation adresse
+    const address = document.getElementById('edit-address').value.trim();
+    if (!address) {
+        showError('edit-address', "L'adresse est requise");
+        isValid = false;
+    } else if (address.length < 10 || address.length > 200) {
+        showError('edit-address', "L'adresse doit contenir entre 10 et 200 caractères");
+        isValid = false;
+    }
+    
+    // Validation email si modifié
+    const newEmail = document.getElementById('edit-email').value.trim();
+    const emailConfirm = document.getElementById('edit-email-confirm').value.trim();
+    const currentEmail = '{{ user.email }}';
+    
+    if (newEmail && newEmail !== currentEmail) {
+        // Validation format email
+        const emailPattern = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/;
+        if (!emailPattern.test(newEmail)) {
+            showError('edit-email', 'Format email invalide');
+            isValid = false;
+        }
+        
+        // Vérifier que les deux emails correspondent
+        if (newEmail !== emailConfirm) {
+            showError('edit-email-confirm', 'Les adresses email ne correspondent pas');
+            isValid = false;
+        }
+    }
+    
+    // Validation mot de passe actuel
+    const password = document.getElementById('current-password').value;
+    if (!password) {
+        showError('current-password', 'Le mot de passe actuel est requis');
+        isValid = false;
+    }
+    
+    // Validation nouveau mot de passe si modifié
+    const newPassword = document.getElementById('edit-new-password').value;
+    const newPasswordConfirm = document.getElementById('edit-new-password-confirm').value;
+    
+    if (newPassword) {
+        // Validation force du mot de passe
+        if (newPassword.length < 8) {
+            showError('edit-new-password', 'Le mot de passe doit contenir au moins 8 caractères');
+            isValid = false;
+        } else {
+            const hasUpper = /[A-Z]/.test(newPassword);
+            const hasLower = /[a-z]/.test(newPassword);
+            const hasDigit = /[0-9]/.test(newPassword);
+            const hasSpecial = /[!@#$%^&*()_+\-=\[\]{}|;:,.<>?]/.test(newPassword);
+            
+            const errors = [];
+            if (!hasUpper) errors.push('une majuscule');
+            if (!hasLower) errors.push('une minuscule');
+            if (!hasDigit) errors.push('un chiffre');
+            if (!hasSpecial) errors.push('un caractère spécial');
+            
+            if (errors.length > 0) {
+                showError('edit-new-password', 'Le mot de passe doit contenir ' + errors.join(', '));
+                isValid = false;
+            }
+        }
+        
+        // Vérifier que les deux mots de passe correspondent
+        if (newPassword !== newPasswordConfirm) {
+            showError('edit-new-password-confirm', 'Les mots de passe ne correspondent pas');
+            isValid = false;
+        }
+    } else if (newPasswordConfirm) {
+        // Si confirmation remplie mais pas le nouveau mot de passe
+        showError('edit-new-password', 'Veuillez entrer un nouveau mot de passe');
+        isValid = false;
+    }
+    
+    return isValid;
+}
+
+document.getElementById('profile-form').addEventListener('submit', async function(e) {
     e.preventDefault();
     
+    if (!validateForm()) {
+        return;
+    }
+    
+    const submitBtn = document.getElementById('submit-btn');
+    submitBtn.disabled = true;
+    submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Sauvegarde...';
+    
     const formData = {
-        first_name: document.getElementById('edit-first-name').value,
-        last_name: document.getElementById('edit-last-name').value,
-        address: document.getElementById('edit-address').value,
-        current_password: document.getElementById('current-password').value
+        first_name: document.getElementById('edit-first-name').value.trim(),
+        last_name: document.getElementById('edit-last-name').value.trim(),
+        address: document.getElementById('edit-address').value.trim(),
+        email: document.getElementById('edit-email').value.trim(),
+        email_confirm: document.getElementById('edit-email-confirm').value.trim(),
+        current_password: document.getElementById('current-password').value,
+        new_password: document.getElementById('edit-new-password').value,
+        new_password_confirm: document.getElementById('edit-new-password-confirm').value
     };
     
-    // Ici vous pourriez ajouter une API pour mettre à jour le profil
-    showNotification('Profil mis à jour avec succès !', 'success');
-    closeProfileModal();
-    setTimeout(() => location.reload(), 1000);
+    try {
+        const response = await fetch('/api/profile/update', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify(formData)
+        });
+        
+        const data = await response.json();
+        
+        if (response.ok && data.success) {
+            // Mettre à jour l'affichage sans recharger la page
+            const nameSpan = document.querySelector('.info-item:nth-child(1) span');
+            const emailSpan = document.querySelector('.info-item:nth-child(2) span');
+            const addressSpan = document.querySelector('.info-item:nth-child(3) span');
+            
+            // Mettre à jour le texte ET les attributs data-*
+            if (nameSpan) {
+                nameSpan.textContent = data.user.first_name + ' ' + data.user.last_name;
+                nameSpan.dataset.firstName = data.user.first_name;
+                nameSpan.dataset.lastName = data.user.last_name;
+            }
+            if (emailSpan) {
+                emailSpan.textContent = data.user.email;
+                emailSpan.dataset.email = data.user.email;
+            }
+            if (addressSpan) {
+                addressSpan.textContent = data.user.address;
+                addressSpan.dataset.address = data.user.address;
+            }
+            document.querySelector('.page-header p').textContent = 
+                'Bienvenue, ' + data.user.first_name + ' ' + data.user.last_name;
+            
+            showNotification('Profil mis à jour avec succès !', 'success');
+            closeProfileModal();
+        } else {
+            showError('current-password', data.error || 'Erreur lors de la mise à jour');
+            showNotification(data.error || 'Erreur lors de la mise à jour', 'error');
+        }
+    } catch (error) {
+        showNotification('Erreur de connexion. Veuillez réessayer.', 'error');
+        console.error('Error:', error);
+    } finally {
+        submitBtn.disabled = false;
+        submitBtn.innerHTML = '<i class="fas fa-save"></i> Sauvegarder';
+    }
 });
 
 // Fermer le modal en cliquant à l'extérieur
@@ -212,4 +466,21 @@ document.getElementById('profile-modal').addEventListener('click', function(e) {
     }
 });
 </script>
+<style>
+.form-error {
+    color: #dc3545;
+    font-size: 0.875rem;
+    display: block;
+    margin-top: 0.25rem;
+}
+.form-hint {
+    color: #6c757d;
+    font-size: 0.875rem;
+    display: block;
+    margin-top: 0.25rem;
+}
+input.error, textarea.error {
+    border-color: #dc3545;
+}
+</style>
 {% endblock %}

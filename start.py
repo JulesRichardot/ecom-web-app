@@ -31,7 +31,7 @@ def start_server():
     """Démarrer le serveur Flask"""
     print("🚀 Démarrage du serveur E-Shop...")
     print("📍 URL: http://localhost:5000")
-    print("👤 Client: client@shop.test / secret")
+    print("👤 Client: client@shop.test / Secret123!")
     print("👨‍💼 Admin: admin@shop.test / admin")
     print("\nAppuyez sur Ctrl+C pour arrêter le serveur")
     

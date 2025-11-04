@@ -8,7 +8,7 @@ pip3 install -r requirements.txt
 echo ""
 echo "🚀 Démarrage du serveur..."
 echo "📍 URL: http://localhost:5000"
-echo "👤 Client: client@shop.test / secret"
+echo "👤 Client: client@shop.test / Secret123!"
 echo ""
 echo "Appuyez sur Ctrl+C pour arrêter le serveur"
 echo ""

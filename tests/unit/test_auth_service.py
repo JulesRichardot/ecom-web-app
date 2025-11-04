@@ -50,7 +50,7 @@ class TestAuthService:
     
     def test_login_success(self, auth_service, test_user):
         """Test successful login."""
-        token = auth_service.login("test@example.com", "testpassword")
+        token = auth_service.login("test@example.com", "TestPassword123!")
         
         assert token is not None
         assert isinstance(token, str)
